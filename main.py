@@ -1,92 +1,56 @@
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
-from transformers import pipeline
+import os
 
-from utils.geometry import mask_to_contour, resample_contour
-from utils.signal import contour_to_fourier
+import numpy as np
+from PIL import Image
+
+######################################################################################################################
+# Workaround for argparse help validation issue with Hydra (see https://github.com/facebookresearch/hydra/issues/3121)
+# I recommend to use Python 3.13 until Hydra adds full 3.14 support.
+import argparse
+_orig_check_help = argparse.ArgumentParser._check_help
+
+def _patched_check_help(self, action):
+    if not isinstance(action.help, str):
+        try:
+            action.help = str(action.help)
+        except Exception:
+            action.help = ""
+    return _orig_check_help(self, action)
+
+argparse.ArgumentParser._check_help = _patched_check_help
+######################################################################################################################
+
+import hydra
+from omegaconf import DictConfig
+
+from src import model, segmentation
 from src.rendering import render_epicycle_gif
 
-def show_sorted_masks(image, masks):
-    img_output_path = "data/output/masks.jpg"
 
-    if not masks:
-        print("No objects detected.")
-        return
+@hydra.main(version_base=None, config_path="conf", config_name="config")
+def main(cfg: DictConfig):
 
-    print(f"Total masks detected: {len(masks)}")
-
-    plt.figure(figsize=(10, 10))
-    plt.imshow(image)
-
-    ax = plt.gca()
-    ax.set_autoscale_on(False)
-
-    sorted_masks = sorted(
-        masks,
-        key=lambda x: np.array(x).sum(),
-        reverse=True
-    )
-
-    for m in sorted_masks:
-        m = m.astype(bool)
-
-        color = np.random.rand(3)
-
-        overlay = np.zeros((*m.shape, 4))
-        overlay[..., :3] = color
-        overlay[..., 3] = m * 0.35
-
-        ax.imshow(overlay)
-
-    plt.axis("off")
-    plt.title(f"Detected {len(masks)} objects")
-
-    plt.savefig(img_output_path, dpi=300)
-    plt.show()
-
-def main():
-    img_path = "data/input.jpg"
-    test_img_path = "data/test_input.jpg"
+    img_path = cfg.img_path
+    img_name = os.path.splitext(os.path.basename(img_path))[0]
+    model_name = cfg.model_name
 
     image = Image.open(img_path).convert("RGB")
 
-    device = "cuda" if torch.cuda.is_available() else "cpu" 
-    print(f"Using device: {device}")
+    generator = model.setup_model(model_name)
 
     try:
-        print("Downloading model...")
-        generator = pipeline("mask-generation", model="facebook/sam-vit-base", device=device)
+        outputs = model.predict_masks(generator, image, cfg.amg)
 
-        print("Generating masks...")
-        outputs = generator(
-            image,
-            pred_iou_thresh=0.98,
-            stability_score_thresh=0.96,
-            min_mask_region_area=6000,
-            #points_per_batch=32
-        )
+        print("visualizing masks...")
+        segmentation.show_sorted_masks(image, outputs.get("masks", []), output_path=f"data/output/masks_{img_name}.jpg")
 
-        print(f"visualizing masks...")
-        show_sorted_masks(image, outputs["masks"])
-
-        print(f"computing fourier representations...")
-        objects = []
-
-        for mask in outputs["masks"]:
-            contour = mask_to_contour(mask)
-            if contour is None or len(contour) < 100:
-                continue
-
-            contour = resample_contour(contour, 256)
-            coeffs, freqs, center = contour_to_fourier(contour)
-            objects.append((coeffs, freqs, center))
+        print("computing fourier representations...")
+        objects = segmentation.masks_to_objects(outputs.get("masks", []))
 
         render_epicycle_gif(
             np.array(image),
             objects,
-            save_path="data/output/epicycle_multi_object.gif",
+            save_path=f"data/output/fourier_drawing_{img_name}.gif",
             frames=240,
             K=60
         )
