@@ -1,6 +1,6 @@
 # Fourier Drawing from Images
 
-| | | |
+|Image|Masks|Fourier Drawing|
 |---|---|---|
 | <img src="data/input.jpg" width="250"> | <img src="data/output/masks_input.jpg" width="250"> | <img src="data/output/fourier_drawing_input.gif" width="250"> |
 | <img src="data/example.jpg" width="250"> | <img src="data/output/masks_example.jpg" width="250"> | <img src="data/output/fourier_drawing_example.gif" width="250"> |
@@ -53,7 +53,7 @@ $z_{\mathrm{global}}(t)=z(t)+(x_c+iy_c)$
 
 ---
 
-### 3 Segmentation
+### 3. Segmentation
 Segmentation is the task of dividing an image into meaningful regions, typically to identify and separate individual objects from the background or from each other.
 
 In this project, I used the SAM model to perform image segmentation.\
