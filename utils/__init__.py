@@ -1,11 +1,10 @@
 """Utility package for geometry and signal helpers."""
 
 from .geometry import mask_to_contour, resample_contour
-from .signal import contour_to_fourier, epicycle_position
+from .signal import contour_to_fourier
 
 __all__ = [
     "mask_to_contour",
     "resample_contour",
     "contour_to_fourier",
-    "epicycle_position",
 ]

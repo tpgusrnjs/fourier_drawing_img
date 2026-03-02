@@ -48,6 +48,7 @@ def show_sorted_masks(image, masks):
 
 def main():
     img_path = "data/input.jpg"
+    test_img_path = "data/test_input.jpg"
 
     image = Image.open(img_path).convert("RGB")
 
@@ -79,10 +80,11 @@ def main():
                 continue
 
             contour = resample_contour(contour, 256)
-            coeffs, freqs = contour_to_fourier(contour)
-            objects.append((coeffs, freqs))
+            coeffs, freqs, center = contour_to_fourier(contour)
+            objects.append((coeffs, freqs, center))
 
         render_epicycle_gif(
+            np.array(image),
             objects,
             save_path="data/output/epicycle_multi_object.gif",
             frames=240,
